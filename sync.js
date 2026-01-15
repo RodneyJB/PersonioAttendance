@@ -18,12 +18,24 @@ async function getAttendances() {
   const today = new Date().toISOString().slice(0, 10);
   const token = await getPersonioToken();
 
-  const res = await axios.get("https://api.personio.de/v1/company/attendances", {
-    headers: { Authorization: `Bearer ${token}` },
-    params: { start_date: today, end_date: today }
-  });
+  if (!token) {
+    console.error("No Personio token returned");
+    return [];
+  }
 
-  return res.data?.data || [];
+  try {
+    const res = await axios.get("https://api.personio.de/v1/company/attendances", {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { start_date: today, end_date: today }
+    });
+
+    const rows = res.data?.data || [];
+    console.log(`Fetched ${rows.length} attendances for ${today}`);
+    return rows;
+  } catch (error) {
+    console.error("Error fetching attendances from Personio", error.response?.data || error.message);
+    return [];
+  }
 }
 
 async function pushToMonday(row) {
@@ -57,31 +69,46 @@ async function pushToMonday(row) {
     }
   `;
 
-  await axios.post(
-    "https://api.monday.com/v2",
-    {
-      query,
-      variables: {
-        boardId: Number(process.env.MONDAY_BOARD_ID),
-        itemName: employeeName,
-        columnValues: JSON.stringify(columnValues)
+  try {
+    const response = await axios.post(
+      "https://api.monday.com/v2",
+      {
+        query,
+        variables: {
+          boardId: Number(process.env.MONDAY_BOARD_ID),
+          itemName: employeeName,
+          columnValues: JSON.stringify(columnValues)
+        }
+      },
+      {
+        headers: {
+          Authorization: process.env.MONDAY_API_TOKEN,
+          "Content-Type": "application/json"
+        }
       }
-    },
-    {
-      headers: {
-        Authorization: process.env.MONDAY_API_TOKEN,
-        "Content-Type": "application/json"
-      }
-    }
-  );
+    );
+
+    console.log("Created Monday item", response.data?.data?.create_item?.id || "(no id)");
+  } catch (error) {
+    console.error("Error pushing attendance to Monday", error.response?.data || error.message);
+    throw error;
+  }
 }
 
 async function syncOnce() {
+  console.log("Starting sync run", new Date().toISOString());
   const data = await getAttendances();
+  console.log(`Sync run: processing ${data.length} attendances`);
 
   for (const row of data) {
-    await pushToMonday(row);
+    try {
+      await pushToMonday(row);
+    } catch (error) {
+      console.error("Failed to push individual attendance", row.id || row.attributes?.id, error.response?.data || error.message);
+    }
   }
+
+  console.log("Finished sync run", new Date().toISOString());
 }
 
 cron.schedule("* * * * *", async () => {
