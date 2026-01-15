@@ -1,5 +1,6 @@
 import axios from "axios";
 import cron from "node-cron";
+import express from "express";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -98,3 +99,19 @@ cron.schedule("*/5 * * * *", async () => {
     console.error("Initial sync error", error.response?.data || error.message);
   }
 })();
+
+// Minimal HTTP server so Render Web Service sees an open port
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.get("/health", (_req, res) => {
+  res.status(200).send("OK");
+});
+
+app.get("/", (_req, res) => {
+  res.status(200).send("Personio-Monday sync is running");
+});
+
+app.listen(port, () => {
+  console.log(`Server listening on port ${port}`);
+});
