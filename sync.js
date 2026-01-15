@@ -84,7 +84,7 @@ async function syncOnce() {
   }
 }
 
-cron.schedule("*/5 * * * *", async () => {
+cron.schedule("* * * * *", async () => {
   try {
     await syncOnce();
   } catch (error) {
