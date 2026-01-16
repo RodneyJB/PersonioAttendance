@@ -232,15 +232,9 @@ async function pushToMonday(row) {
   const attendanceId = attributes.id_v2 || row.id;
   const currentHash = computeHash(columnValues);
 
-  // Load internal mappings to avoid duplicates
+  // Load internal mappings to avoid duplicates (no external lookup)
   const mappings = await loadMappings();
-
-  let itemId = mappings[attendanceId]?.itemId;
-
-  if (!itemId) {
-    // Fallback: try to find existing in Monday in case mappings were reset
-    itemId = await findItemByAttendanceId(attendanceId, process.env.MONDAY_API_TOKEN);
-  }
+  const itemId = mappings[attendanceId]?.itemId;
 
   if (itemId) {
     // Only update if something changed
