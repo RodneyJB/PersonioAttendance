@@ -77,11 +77,11 @@ async function pushToMonday(row) {
     : 0;
 
   const columnValues = {
-    // text_mkzm768y: attributes.employee,
-    // date4: attributes.date,
-    // date_mkzm3eqt: attributes.date,
-    // numeric_mkzm4ydj: Number(hours.toFixed(2)),
-    // text_mkzm7ea3: attributes.id_v2 || row.id
+    // text_mkzm768y: attributes.employee,  // Commented out due to possible validation issue
+    date4: attributes.date,
+    date_mkzm3eqt: attributes.date,
+    numeric_mkzm4ydj: Number(hours.toFixed(2)),
+    text_mkzm7ea3: attributes.id_v2 || row.id
   };
 
   const query = `
