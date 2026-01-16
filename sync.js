@@ -304,6 +304,39 @@ app.get("/", (_req, res) => {
   res.status(200).send("Personio-Monday sync is running");
 });
 
+// Visibility/control endpoints for internal mappings
+app.get("/mappings", async (_req, res) => {
+  try {
+    const mappings = await loadMappings();
+    res.status(200).json(mappings);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/mappings/:attendanceId", async (req, res) => {
+  try {
+    const mappings = await loadMappings();
+    const entry = mappings[req.params.attendanceId];
+    if (entry) {
+      res.status(200).json(entry);
+    } else {
+      res.status(404).json({ error: "attendanceId not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/mappings/reset", async (_req, res) => {
+  try {
+    await saveMappings({});
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
 });
