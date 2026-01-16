@@ -16,7 +16,11 @@ async function loadMappings() {
 }
 
 async function saveMappings(mappings) {
-  await fs.writeFile('mappings.json', JSON.stringify(mappings, null, 2));
+  try {
+    await fs.writeFile('mappings.json', JSON.stringify(mappings, null, 2));
+  } catch (error) {
+    console.error("Error saving mappings:", error.message);
+  }
 }
 
 async function getPersonioToken() {
