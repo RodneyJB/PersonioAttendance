@@ -70,19 +70,6 @@ async function itemExists(boardId, attendanceId, token) {
     return false;
   }
 }
-  const token = await getPersonioToken();
-
-  try {
-    const res = await axios.get(`https://api.personio.de/v1/company/employees/${employeeId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    return res.data?.data || {};
-  } catch (error) {
-    console.error("Error fetching employee", employeeId, error.message);
-    return {};
-  }
-}
 
 async function getAttendances() {
   const today = new Date().toISOString().slice(0, 10);
