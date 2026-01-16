@@ -237,10 +237,16 @@ async function pushToMonday(row) {
   const mappingEntry = mappings[attendanceId];
   const itemId = mappingEntry?.itemId;
   const prevEndTime = mappingEntry?.lastEndTime ?? null;
+  const prevStartTime = mappingEntry?.lastStartTime ?? null;
   const newEndTime = attributes.end_time ?? null;
+  const newStartTime = attributes.start_time ?? null;
 
   if (itemId) {
-    const shouldUpdate = (mappingEntry?.hash !== currentHash) || (prevEndTime !== newEndTime);
+    // If still clocked in (no end time), update when start time changed
+    const shouldUpdateOngoing = !newEndTime && (prevStartTime !== newStartTime);
+    // If completed (has end time), update when end time changed
+    const shouldUpdateCompleted = !!newEndTime && (prevEndTime !== newEndTime);
+    const shouldUpdate = shouldUpdateOngoing || shouldUpdateCompleted || (mappingEntry?.hash !== currentHash);
     if (shouldUpdate) {
       console.log(`Updating existing item ${itemId} for attendance ${attendanceId}`);
       if (prevEndTime !== newEndTime) {
