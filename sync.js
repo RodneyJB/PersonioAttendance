@@ -138,9 +138,9 @@ async function pushToMonday(row) {
 
   const columnValues = {
     text_mkzm768y: email,  // Use email for Employee ID column
-    date4: { date: attributes.date, time: attributes.start_time },
-    date_mkzm3eqt: { date: attributes.date, time: attributes.end_time },
-    numeric_mkzm4ydj: Number(hours.toFixed(2)),
+    date4: { date: attributes.date, time: attributes.start_time + ":00" },
+    date_mkzm3eqt: { date: attributes.date, time: attributes.end_time + ":00" },
+    numeric_mkzm4ydj: hours.toFixed(2),
     text_mkzm7ea3: attributes.id_v2 || row.id
   };
 
