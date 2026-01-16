@@ -31,6 +31,9 @@ async function getAttendances() {
 
     const rows = res.data?.data || [];
     console.log(`Fetched ${rows.length} attendances for ${today}`);
+    if (rows.length === 0) {
+      console.log("API response data:", JSON.stringify(res.data, null, 2));
+    }
     return rows;
   } catch (error) {
     console.error("Error fetching attendances from Personio", error.response?.data || error.message);
