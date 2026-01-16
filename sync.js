@@ -60,6 +60,8 @@ async function findItemByAttendanceId(attendanceId, token) {
     return null;
   }
 }
+
+async function updateItem(itemId, columnValues, token) {
   const query = `
     mutation ChangeColumnValues($itemId: ID!, $columnValues: JSON!) {
       change_multiple_column_values(
