@@ -16,6 +16,7 @@ async function getPersonioToken() {
 
 async function getAttendances() {
   const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const token = await getPersonioToken();
 
   if (!token) {
@@ -26,11 +27,11 @@ async function getAttendances() {
   try {
     const res = await axios.get("https://api.personio.de/v1/company/attendances", {
       headers: { Authorization: `Bearer ${token}` },
-      params: { start_date: today, end_date: today }
+      params: { start_date: yesterday, end_date: today }
     });
 
     const rows = res.data?.data || [];
-    console.log(`Fetched ${rows.length} attendances for ${today}`);
+    console.log(`Fetched ${rows.length} attendances for ${yesterday} to ${today}`);
     if (rows.length === 0) {
       console.log("API response data:", JSON.stringify(res.data, null, 2));
     }
