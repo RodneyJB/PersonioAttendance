@@ -44,6 +44,7 @@ async function getAttendances() {
 
 async function pushToMonday(row) {
   const attributes = row.attributes || {};
+  console.log("Attendance attributes:", JSON.stringify(attributes, null, 2));
 
   const employeeName = attributes.employee_name || "Personio Attendance";
   const start = attributes.check_in || attributes.start_time;
@@ -92,7 +93,15 @@ async function pushToMonday(row) {
       }
     );
 
+    if (response.data?.errors) {
+      console.error("Monday API errors:", response.data.errors);
+      throw new Error("Monday API error");
+    }
+
     console.log("Created Monday item", response.data?.data?.create_item?.id || "(no id)");
+    if (!response.data?.data?.create_item?.id) {
+      console.log("Monday API response:", JSON.stringify(response.data, null, 2));
+    }
   } catch (error) {
     console.error("Error pushing attendance to Monday", error.response?.data || error.message);
     throw error;
