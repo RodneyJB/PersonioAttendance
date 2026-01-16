@@ -174,6 +174,9 @@ async function pushToMonday(row) {
     }
   `;
 
+  console.log("Monday create query:", query);
+  console.log("Variables:", JSON.stringify({ boardId: Number(process.env.MONDAY_BOARD_ID), itemName: employeeName, columnValues: JSON.stringify(columnValues) }, null, 2));
+
   try {
     const response = await axios.post(
       "https://api.monday.com/v2",
