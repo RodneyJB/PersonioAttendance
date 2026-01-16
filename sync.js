@@ -2,8 +2,22 @@ import axios from "axios";
 import cron from "node-cron";
 import express from "express";
 import dotenv from "dotenv";
+import fs from "fs/promises";
 
 dotenv.config();
+
+async function loadMappings() {
+  try {
+    const data = await fs.readFile('mappings.json', 'utf8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+async function saveMappings(mappings) {
+  await fs.writeFile('mappings.json', JSON.stringify(mappings, null, 2));
+}
 
 async function getPersonioToken() {
   const res = await axios.post("https://api.personio.de/v1/auth", {
@@ -133,8 +147,8 @@ async function pushToMonday(row) {
 
   const columnValues = {
     text_mkzm768y: email,  // Use email for Employee ID column
-    date4: `${attributes.date} ${attributes.start_time}:00`,
-    date_mkzm3eqt: `${attributes.date} ${attributes.end_time}:00`,
+    date4: `${attributes.date}T${attributes.start_time}:00`,
+    date_mkzm3eqt: `${attributes.date}T${attributes.end_time}:00`,
     numeric_mkzm4ydj: Number(hours.toFixed(2)),
     text_mkzm7ea3: attributes.id_v2 || row.id
   };
