@@ -65,6 +65,8 @@ async function pushToMonday(row) {
     : "Personio Attendance";
   const email = employeeData.email || "";
 
+  const itemName = email || employeeName;
+
   const start = attributes.start_time;
   const end = attributes.end_time;
 
