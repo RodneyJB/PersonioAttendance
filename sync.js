@@ -27,6 +27,13 @@ function computeHash(columnValues) {
   return JSON.stringify(columnValues);
 }
 
+function subtractHour(timeStr) {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hours - 1, minutes, 0, 0);
+  return date.toTimeString().slice(0, 8); // HH:MM:SS
+}
+
 async function getPersonioToken() {
   const res = await axios.post("https://api.personio.de/v1/auth", {
     client_id: process.env.PERSONIO_CLIENT_ID,
@@ -131,7 +138,6 @@ async function createItem(boardId, itemName, columnValues, token) {
 
 async function getAttendances() {
   const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const token = await getPersonioToken();
 
   if (!token) {
@@ -142,11 +148,11 @@ async function getAttendances() {
   try {
     const res = await axios.get("https://api.personio.de/v1/company/attendances", {
       headers: { Authorization: `Bearer ${token}` },
-      params: { start_date: yesterday, end_date: today }
+      params: { start_date: today, end_date: today }
     });
 
     const rows = res.data?.data || [];
-    console.log(`Fetched ${rows.length} attendances for ${yesterday} to ${today}`);
+    console.log(`Fetched ${rows.length} attendances for ${today}`);
     if (rows.length === 0) {
       console.log("API response data:", JSON.stringify(res.data, null, 2));
     }
@@ -196,8 +202,8 @@ async function pushToMonday(row) {
 
   const columnValues = {
     text_mkzm768y: email,  // Use email for Employee ID column
-    date4: { date: attributes.date, time: attributes.start_time + ":00" },
-    date_mkzm3eqt: { date: attributes.date, time: attributes.end_time + ":00" },
+    date4: { date: attributes.date, time: subtractHour(attributes.start_time) },
+    date_mkzm3eqt: { date: attributes.date, time: subtractHour(attributes.end_time) },
     numeric_mkzm4ydj: hours.toFixed(2),
     text_mkzm7ea3: attributes.id_v2 || row.id
   };
