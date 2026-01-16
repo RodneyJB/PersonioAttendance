@@ -184,12 +184,6 @@ async function pushToMonday(row) {
   const attributes = row.attributes || {};
   console.log("Attendance attributes:", JSON.stringify(attributes, null, 2));
 
-  // Skip ongoing attendances (no end_time)
-  if (!attributes.end_time) {
-    console.log("Skipping ongoing attendance (no end_time)");
-    return;
-  }
-
   const employeeData = await getEmployee(attributes.employee);
   console.log("Employee data for", attributes.employee, ":", employeeData);
   const employeeName = employeeData.first_name && employeeData.last_name
@@ -209,10 +203,14 @@ async function pushToMonday(row) {
   const columnValues = {
     text_mkzm768y: email,  // Use email for Employee ID column
     date4: { date: attributes.date, time: subtractHour(attributes.start_time) },
-    date_mkzm3eqt: { date: attributes.date, time: subtractHour(attributes.end_time) },
     numeric_mkzm4ydj: hours.toFixed(2),
     text_mkzm7ea3: attributes.id_v2 || row.id
   };
+
+  // Only set end time if attendance is completed
+  if (attributes.end_time) {
+    columnValues.date_mkzm3eqt = { date: attributes.date, time: subtractHour(attributes.end_time) };
+  }
 
   console.log("Column values:", JSON.stringify(columnValues, null, 2));
 
