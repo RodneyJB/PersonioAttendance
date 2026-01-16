@@ -14,7 +14,44 @@ async function getPersonioToken() {
   return res.data?.data?.token;
 }
 
-async function getEmployee(employeeId) {
+async function itemExists(boardId, attendanceId, token) {
+  const query = `
+    query {
+      boards(ids: [${boardId}]) {
+        items {
+          id
+          column_values(ids: ["text_mkzm7ea3"]) {
+            text
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await axios.post(
+      "https://api.monday.com/v2",
+      { query },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    if (response.data?.errors) {
+      console.error("Error querying Monday items:", response.data.errors);
+      return false;
+    }
+
+    const items = response.data?.data?.boards?.[0]?.items || [];
+    return items.some(item => item.column_values?.[0]?.text === attendanceId);
+  } catch (error) {
+    console.error("Error checking item existence:", error.message);
+    return false;
+  }
+}
   const token = await getPersonioToken();
 
   try {
@@ -77,12 +114,19 @@ async function pushToMonday(row) {
     : 0;
 
   const columnValues = {
-    // text_mkzm768y: attributes.employee,  // Commented out due to possible validation issue
+    text_mkzm768y: email,  // Use email for Employee ID column
     date4: attributes.date,
     date_mkzm3eqt: attributes.date,
     numeric_mkzm4ydj: Number(hours.toFixed(2)),
     text_mkzm7ea3: attributes.id_v2 || row.id
   };
+
+  // Check if item already exists
+  const exists = await itemExists(process.env.MONDAY_BOARD_ID, attributes.id_v2 || row.id, process.env.MONDAY_API_TOKEN);
+  if (exists) {
+    console.log(`Item for attendance ${attributes.id_v2 || row.id} already exists, skipping.`);
+    return;
+  }
 
   const query = `
     mutation CreateItem($boardId: ID!, $itemName: String!, $columnValues: JSON!) {
