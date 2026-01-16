@@ -23,6 +23,10 @@ async function saveMappings(mappings) {
   }
 }
 
+function computeHash(columnValues) {
+  return JSON.stringify(columnValues);
+}
+
 async function getPersonioToken() {
   const res = await axios.post("https://api.personio.de/v1/auth", {
     client_id: process.env.PERSONIO_CLIENT_ID,
@@ -32,16 +36,14 @@ async function getPersonioToken() {
   return res.data?.data?.token;
 }
 
-async function itemExists(boardId, attendanceId, token) {
+async function updateItem(itemId, columnValues, token) {
   const query = `
-    query {
-      boards(ids: [${boardId}]) {
-        items {
-          id
-          column_values(ids: ["text_mkzm7ea3"]) {
-            text
-          }
-        }
+    mutation ChangeColumnValues($itemId: ID!, $columnValues: JSON!) {
+      change_multiple_column_values(
+        item_id: $itemId,
+        column_values: $columnValues
+      ) {
+        id
       }
     }
   `;
@@ -49,25 +51,81 @@ async function itemExists(boardId, attendanceId, token) {
   try {
     const response = await axios.post(
       "https://api.monday.com/v2",
-      { query },
+      {
+        query,
+        variables: {
+          itemId: Number(itemId),
+          columnValues: JSON.stringify(columnValues)
+        }
+      },
       {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: token,
           "Content-Type": "application/json"
         }
       }
     );
 
     if (response.data?.errors) {
-      console.error("Error querying Monday items:", response.data.errors);
-      return false;
+      console.error("Monday API errors:", response.data.errors);
+      throw new Error("Monday API error");
     }
 
-    const items = response.data?.data?.boards?.[0]?.items || [];
-    return items.some(item => item.column_values?.[0]?.text === attendanceId);
+    console.log("Updated Monday item", itemId);
   } catch (error) {
-    console.error("Error checking item existence:", error.message);
-    return false;
+    console.error("Error updating item:", error.message);
+    throw error;
+  }
+}
+
+async function createItem(boardId, itemName, columnValues, token) {
+  const query = `
+    mutation CreateItem($boardId: ID!, $itemName: String!, $columnValues: JSON!) {
+      create_item(
+        board_id: $boardId,
+        item_name: $itemName,
+        column_values: $columnValues
+      ) {
+        id
+      }
+    }
+  `;
+
+  try {
+    const response = await axios.post(
+      "https://api.monday.com/v2",
+      {
+        query,
+        variables: {
+          boardId: Number(boardId),
+          itemName,
+          columnValues: JSON.stringify(columnValues)
+        }
+      },
+      {
+        headers: {
+          Authorization: token,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    if (response.data?.errors) {
+      console.error("Monday API errors:", response.data.errors);
+      console.error("Error data:", JSON.stringify(response.data.errors[0]?.extensions?.error_data, null, 2));
+      throw new Error("Monday API error");
+    }
+
+    const itemId = response.data?.data?.create_item?.id;
+    console.log("Created Monday item", itemId || "(no id)");
+    if (!itemId) {
+      console.log("Monday API response:", JSON.stringify(response.data, null, 2));
+      throw new Error("No item ID returned");
+    }
+    return itemId;
+  } catch (error) {
+    console.error("Error creating item:", error.message);
+    throw error;
   }
 }
 
@@ -144,62 +202,34 @@ async function pushToMonday(row) {
     text_mkzm7ea3: attributes.id_v2 || row.id
   };
 
-  console.log("Sending columnValues:", JSON.stringify(columnValues, null, 2));
+  console.log("Column values:", JSON.stringify(columnValues, null, 2));
 
-  // Check if item already exists
-  const exists = await itemExists(process.env.MONDAY_BOARD_ID, attributes.id_v2 || row.id, process.env.MONDAY_API_TOKEN);
-  if (exists) {
-    console.log(`Item for attendance ${attributes.id_v2 || row.id} already exists, skipping.`);
-    return;
+  const attendanceId = attributes.id_v2 || row.id;
+  const currentHash = computeHash(columnValues);
+
+  let mappings = await loadMappings();
+  let updated = false;
+
+  if (mappings[attendanceId]) {
+    // Item exists, check if data changed
+    if (mappings[attendanceId].hash !== currentHash) {
+      console.log(`Data changed for attendance ${attendanceId}, updating item ${mappings[attendanceId].itemId}`);
+      await updateItem(mappings[attendanceId].itemId, columnValues, process.env.MONDAY_API_TOKEN);
+      mappings[attendanceId].hash = currentHash;
+      updated = true;
+    } else {
+      console.log(`No changes for attendance ${attendanceId}, skipping.`);
+    }
+  } else {
+    // Create new item
+    console.log(`Creating new item for attendance ${attendanceId}`);
+    const itemId = await createItem(process.env.MONDAY_BOARD_ID, itemName, columnValues, process.env.MONDAY_API_TOKEN);
+    mappings[attendanceId] = { itemId, hash: currentHash };
+    updated = true;
   }
 
-  const query = `
-    mutation CreateItem($boardId: ID!, $itemName: String!, $columnValues: JSON!) {
-      create_item(
-        board_id: $boardId,
-        item_name: $itemName,
-        column_values: $columnValues
-      ) {
-        id
-      }
-    }
-  `;
-
-  console.log("Monday create query:", query);
-  console.log("Variables:", JSON.stringify({ boardId: Number(process.env.MONDAY_BOARD_ID), itemName: employeeName, columnValues: JSON.stringify(columnValues) }, null, 2));
-
-  try {
-    const response = await axios.post(
-      "https://api.monday.com/v2",
-      {
-        query,
-        variables: {
-          boardId: Number(process.env.MONDAY_BOARD_ID),
-          itemName: employeeName,
-          columnValues: JSON.stringify(columnValues)
-        }
-      },
-      {
-        headers: {
-          Authorization: process.env.MONDAY_API_TOKEN,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    if (response.data?.errors) {
-      console.error("Monday API errors:", response.data.errors);
-      console.error("Error data:", JSON.stringify(response.data.errors[0]?.extensions?.error_data, null, 2));
-      throw new Error("Monday API error");
-    }
-
-    console.log("Created Monday item", response.data?.data?.create_item?.id || "(no id)");
-    if (!response.data?.data?.create_item?.id) {
-      console.log("Monday API response:", JSON.stringify(response.data, null, 2));
-    }
-  } catch (error) {
-    console.error("Error pushing attendance to Monday", error.response?.data || error.message);
-    throw error;
+  if (updated) {
+    await saveMappings(mappings);
   }
 }
 
