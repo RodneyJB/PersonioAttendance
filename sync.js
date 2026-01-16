@@ -27,13 +27,6 @@ function computeHash(columnValues) {
   return JSON.stringify(columnValues);
 }
 
-function subtractHour(timeStr) {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const date = new Date();
-  date.setHours(hours - 1, minutes, 0, 0);
-  return date.toTimeString().slice(0, 8); // HH:MM:SS
-}
-
 async function getPersonioToken() {
   const res = await axios.post("https://api.personio.de/v1/auth", {
     client_id: process.env.PERSONIO_CLIENT_ID,
@@ -200,14 +193,14 @@ async function pushToMonday(row) {
     : 0;
 
   const columnValues = {
-    date4: { date: attributes.date, time: subtractHour(attributes.start_time) },
+    date4: { date: attributes.date, time: attributes.start_time + ":00" },
     numeric_mkzm4ydj: hours.toFixed(2),
     text_mkzm7ea3: attributes.id_v2 || row.id
   };
 
   // Only set end time if attendance is completed
   if (attributes.end_time) {
-    columnValues.date_mkzm3eqt = { date: attributes.date, time: subtractHour(attributes.end_time) };
+    columnValues.date_mkzm3eqt = { date: attributes.date, time: attributes.end_time + ":00" };
   }
 
   console.log("Column values:", JSON.stringify(columnValues, null, 2));
