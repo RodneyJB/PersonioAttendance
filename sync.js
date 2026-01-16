@@ -115,7 +115,7 @@ async function pushToMonday(row) {
 
     if (response.data?.errors) {
       console.error("Monday API errors:", response.data.errors);
-      console.error("Error data:", response.data.errors[0]?.extensions?.error_data);
+      console.error("Error data:", JSON.stringify(response.data.errors[0]?.extensions?.error_data, null, 2));
       throw new Error("Monday API error");
     }
 
