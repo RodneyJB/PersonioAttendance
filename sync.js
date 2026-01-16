@@ -153,6 +153,8 @@ async function pushToMonday(row) {
     text_mkzm7ea3: attributes.id_v2 || row.id
   };
 
+  console.log("Sending columnValues:", JSON.stringify(columnValues, null, 2));
+
   // Check if item already exists
   const exists = await itemExists(process.env.MONDAY_BOARD_ID, attributes.id_v2 || row.id, process.env.MONDAY_API_TOKEN);
   if (exists) {
