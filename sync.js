@@ -189,7 +189,6 @@ async function pushToMonday(row) {
   const employeeName = employeeData.first_name && employeeData.last_name
     ? `${employeeData.first_name} ${employeeData.last_name}`
     : "Personio Attendance";
-  const email = employeeData.email || "";
 
   const itemName = String(attributes.employee);
 
@@ -201,7 +200,6 @@ async function pushToMonday(row) {
     : 0;
 
   const columnValues = {
-    text_mkzm768y: email,  // Use email for Employee ID column
     date4: { date: attributes.date, time: subtractHour(attributes.start_time) },
     numeric_mkzm4ydj: hours.toFixed(2),
     text_mkzm7ea3: attributes.id_v2 || row.id
