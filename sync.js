@@ -2,8 +2,30 @@ import axios from "axios";
 import cron from "node-cron";
 import express from "express";
 import dotenv from "dotenv";
+import fs from "fs/promises";
 
 dotenv.config();
+
+async function loadMappings() {
+  try {
+    const data = await fs.readFile('mappings.json', 'utf8');
+    return JSON.parse(data);
+  } catch {
+    return {};
+  }
+}
+
+async function saveMappings(mappings) {
+  try {
+    await fs.writeFile('mappings.json', JSON.stringify(mappings, null, 2));
+  } catch (error) {
+    console.error("Error saving mappings:", error.message);
+  }
+}
+
+function computeHash(columnValues) {
+  return JSON.stringify(columnValues);
+}
 
 function subtractHour(timeStr) {
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -208,16 +230,33 @@ async function pushToMonday(row) {
   console.log("Column values:", JSON.stringify(columnValues, null, 2));
 
   const attendanceId = attributes.id_v2 || row.id;
+  const currentHash = computeHash(columnValues);
 
-  // Check if item already exists in Monday
-  const existingItemId = await findItemByAttendanceId(attendanceId, process.env.MONDAY_API_TOKEN);
-  if (existingItemId) {
-    console.log(`Item exists for attendance ${attendanceId}, updating item ${existingItemId}`);
-    await updateItem(existingItemId, columnValues, process.env.MONDAY_API_TOKEN);
+  // Load internal mappings to avoid duplicates
+  const mappings = await loadMappings();
+
+  let itemId = mappings[attendanceId]?.itemId;
+
+  if (!itemId) {
+    // Fallback: try to find existing in Monday in case mappings were reset
+    itemId = await findItemByAttendanceId(attendanceId, process.env.MONDAY_API_TOKEN);
+  }
+
+  if (itemId) {
+    // Only update if something changed
+    if (mappings[attendanceId]?.hash !== currentHash) {
+      console.log(`Updating existing item ${itemId} for attendance ${attendanceId}`);
+      await updateItem(itemId, columnValues, process.env.MONDAY_API_TOKEN);
+      mappings[attendanceId] = { itemId, hash: currentHash };
+      await saveMappings(mappings);
+    } else {
+      console.log(`No changes for attendance ${attendanceId}, skipping.`);
+    }
   } else {
-    // Create new item
     console.log(`Creating new item for attendance ${attendanceId}`);
-    await createItem(process.env.MONDAY_BOARD_ID, itemName, columnValues, process.env.MONDAY_API_TOKEN);
+    const newId = await createItem(process.env.MONDAY_BOARD_ID, itemName, columnValues, process.env.MONDAY_API_TOKEN);
+    mappings[attendanceId] = { itemId: newId, hash: currentHash };
+    await saveMappings(mappings);
   }
 }
 
