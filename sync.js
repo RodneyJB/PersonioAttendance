@@ -234,14 +234,20 @@ async function pushToMonday(row) {
 
   // Load internal mappings to avoid duplicates (no external lookup)
   const mappings = await loadMappings();
-  const itemId = mappings[attendanceId]?.itemId;
+  const mappingEntry = mappings[attendanceId];
+  const itemId = mappingEntry?.itemId;
+  const prevEndTime = mappingEntry?.lastEndTime ?? null;
+  const newEndTime = attributes.end_time ?? null;
 
   if (itemId) {
-    // Only update if something changed
-    if (mappings[attendanceId]?.hash !== currentHash) {
+    const shouldUpdate = (mappingEntry?.hash !== currentHash) || (prevEndTime !== newEndTime);
+    if (shouldUpdate) {
       console.log(`Updating existing item ${itemId} for attendance ${attendanceId}`);
+      if (prevEndTime !== newEndTime) {
+        console.log(`End time changed: ${prevEndTime} -> ${newEndTime}`);
+      }
       await updateItem(itemId, columnValues, process.env.MONDAY_API_TOKEN);
-      mappings[attendanceId] = { itemId, hash: currentHash };
+      mappings[attendanceId] = { itemId, hash: currentHash, lastEndTime: newEndTime, lastStartTime: attributes.start_time };
       await saveMappings(mappings);
     } else {
       console.log(`No changes for attendance ${attendanceId}, skipping.`);
@@ -249,7 +255,7 @@ async function pushToMonday(row) {
   } else {
     console.log(`Creating new item for attendance ${attendanceId}`);
     const newId = await createItem(process.env.MONDAY_BOARD_ID, itemName, columnValues, process.env.MONDAY_API_TOKEN);
-    mappings[attendanceId] = { itemId: newId, hash: currentHash };
+    mappings[attendanceId] = { itemId: newId, hash: currentHash, lastEndTime: newEndTime, lastStartTime: attributes.start_time };
     await saveMappings(mappings);
   }
 }
