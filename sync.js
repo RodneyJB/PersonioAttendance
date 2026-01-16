@@ -14,7 +14,20 @@ async function getPersonioToken() {
   return res.data?.data?.token;
 }
 
-async function getAttendances() {
+async function getEmployee(employeeId) {
+  const token = await getPersonioToken();
+
+  try {
+    const res = await axios.get(`https://api.personio.de/v1/company/employees/${employeeId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    return res.data?.data || {};
+  } catch (error) {
+    console.error("Error fetching employee", employeeId, error.message);
+    return {};
+  }
+}
   const today = new Date().toISOString().slice(0, 10);
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const token = await getPersonioToken();
@@ -46,20 +59,25 @@ async function pushToMonday(row) {
   const attributes = row.attributes || {};
   console.log("Attendance attributes:", JSON.stringify(attributes, null, 2));
 
-  const employeeName = attributes.employee_name || "Personio Attendance";
-  const start = attributes.check_in || attributes.start_time;
-  const end = attributes.check_out || attributes.end_time;
+  const employeeData = await getEmployee(attributes.employee);
+  const employeeName = employeeData.first_name && employeeData.last_name
+    ? `${employeeData.first_name} ${employeeData.last_name}`
+    : "Personio Attendance";
+  const email = employeeData.email || "";
+
+  const start = attributes.start_time;
+  const end = attributes.end_time;
 
   const hours = start && end
-    ? (new Date(end) - new Date(start)) / 3600000
+    ? (new Date(`${attributes.date}T${end}:00`) - new Date(`${attributes.date}T${start}:00`)) / 3600000
     : 0;
 
   const columnValues = {
-    text_mkzm768y: attributes.employee_id,
+    text_mkzm768y: attributes.employee,
     date4: attributes.date,
     date_mkzm3eqt: attributes.date,
     numeric_mkzm4ydj: Number(hours.toFixed(2)),
-    text_mkzm7ea3: attributes.id || row.id
+    text_mkzm7ea3: attributes.id_v2 || row.id
   };
 
   const query = `
