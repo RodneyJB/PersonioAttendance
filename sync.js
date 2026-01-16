@@ -2,30 +2,8 @@ import axios from "axios";
 import cron from "node-cron";
 import express from "express";
 import dotenv from "dotenv";
-import fs from "fs/promises";
 
 dotenv.config();
-
-async function loadMappings() {
-  try {
-    const data = await fs.readFile('mappings.json', 'utf8');
-    return JSON.parse(data);
-  } catch {
-    return {};
-  }
-}
-
-async function saveMappings(mappings) {
-  try {
-    await fs.writeFile('mappings.json', JSON.stringify(mappings, null, 2));
-  } catch (error) {
-    console.error("Error saving mappings:", error.message);
-  }
-}
-
-function computeHash(columnValues) {
-  return JSON.stringify(columnValues);
-}
 
 async function getPersonioToken() {
   const res = await axios.post("https://api.personio.de/v1/auth", {
@@ -36,7 +14,45 @@ async function getPersonioToken() {
   return res.data?.data?.token;
 }
 
-async function updateItem(itemId, columnValues, token) {
+async function findItemByAttendanceId(attendanceId, token) {
+  const query = `
+    query {
+      boards(ids: ["${process.env.MONDAY_BOARD_ID}"]) {
+        items {
+          id
+          column_values(ids: ["text_mkzm7ea3"]) {
+            text
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await axios.post(
+      "https://api.monday.com/v2",
+      { query },
+      {
+        headers: {
+          Authorization: token,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    if (response.data?.errors) {
+      console.error("Error querying Monday items:", response.data.errors);
+      return null;
+    }
+
+    const items = response.data?.data?.boards?.[0]?.items || [];
+    const item = items.find(item => item.column_values?.[0]?.text === attendanceId);
+    return item ? item.id : null;
+  } catch (error) {
+    console.error("Error finding item by attendance ID:", error.message);
+    return null;
+  }
+}
   const query = `
     mutation ChangeColumnValues($itemId: ID!, $columnValues: JSON!) {
       change_multiple_column_values(
@@ -206,31 +222,16 @@ async function pushToMonday(row) {
   console.log("Column values:", JSON.stringify(columnValues, null, 2));
 
   const attendanceId = attributes.id_v2 || row.id;
-  const currentHash = computeHash(columnValues);
 
-  let mappings = await loadMappings();
-  let updated = false;
-
-  if (mappings[attendanceId]) {
-    // Item exists, check if data changed
-    if (mappings[attendanceId].hash !== currentHash) {
-      console.log(`Data changed for attendance ${attendanceId}, updating item ${mappings[attendanceId].itemId}`);
-      await updateItem(mappings[attendanceId].itemId, columnValues, process.env.MONDAY_API_TOKEN);
-      mappings[attendanceId].hash = currentHash;
-      updated = true;
-    } else {
-      console.log(`No changes for attendance ${attendanceId}, skipping.`);
-    }
+  // Check if item already exists in Monday
+  const existingItemId = await findItemByAttendanceId(attendanceId, process.env.MONDAY_API_TOKEN);
+  if (existingItemId) {
+    console.log(`Item exists for attendance ${attendanceId}, updating item ${existingItemId}`);
+    await updateItem(existingItemId, columnValues, process.env.MONDAY_API_TOKEN);
   } else {
     // Create new item
     console.log(`Creating new item for attendance ${attendanceId}`);
-    const itemId = await createItem(process.env.MONDAY_BOARD_ID, itemName, columnValues, process.env.MONDAY_API_TOKEN);
-    mappings[attendanceId] = { itemId, hash: currentHash };
-    updated = true;
-  }
-
-  if (updated) {
-    await saveMappings(mappings);
+    await createItem(process.env.MONDAY_BOARD_ID, itemName, columnValues, process.env.MONDAY_API_TOKEN);
   }
 }
 
