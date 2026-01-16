@@ -184,6 +184,12 @@ async function pushToMonday(row) {
   const attributes = row.attributes || {};
   console.log("Attendance attributes:", JSON.stringify(attributes, null, 2));
 
+  // Skip ongoing attendances (no end_time)
+  if (!attributes.end_time) {
+    console.log("Skipping ongoing attendance (no end_time)");
+    return;
+  }
+
   const employeeData = await getEmployee(attributes.employee);
   console.log("Employee data for", attributes.employee, ":", employeeData);
   const employeeName = employeeData.first_name && employeeData.last_name
