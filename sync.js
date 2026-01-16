@@ -94,11 +94,29 @@ async function getAttendances() {
   }
 }
 
+async function getEmployee(employeeId) {
+  const token = await getPersonioToken();
+
+  try {
+    const res = await axios.get("https://api.personio.de/v1/company/employees", {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { limit: 1000 }  // Adjust limit as needed
+    });
+
+    const employees = res.data?.data || [];
+    return employees.find(emp => emp.id == employeeId) || {};
+  } catch (error) {
+    console.error("Error fetching employees", error.message);
+    return {};
+  }
+}
+
 async function pushToMonday(row) {
   const attributes = row.attributes || {};
   console.log("Attendance attributes:", JSON.stringify(attributes, null, 2));
 
   const employeeData = await getEmployee(attributes.employee);
+  console.log("Employee data for", attributes.employee, ":", employeeData);
   const employeeName = employeeData.first_name && employeeData.last_name
     ? `${employeeData.first_name} ${employeeData.last_name}`
     : "Personio Attendance";
