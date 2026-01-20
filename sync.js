@@ -282,7 +282,7 @@ async function syncOnce() {
   console.log("Finished sync run", new Date().toISOString());
 }
 
-cron.schedule("* * * * *", async () => {
+cron.schedule("0 * * * *", async () => {
   try {
     await syncOnce();
   } catch (error) {
@@ -290,13 +290,7 @@ cron.schedule("* * * * *", async () => {
   }
 });
 
-(async () => {
-  try {
-    await syncOnce();
-  } catch (error) {
-    console.error("Initial sync error", error.response?.data || error.message);
-  }
-})();
+// Removed initial immediate sync to run strictly on an hourly basis
 
 // Minimal HTTP server so Render Web Service sees an open port
 const app = express();
